@@ -3,6 +3,11 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 module.exports = async (req, res) => {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).end('Method Not Allowed');
+  }
+
   const { answers } = req.body;
 
   try {
@@ -10,13 +15,7 @@ module.exports = async (req, res) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Personalized Health Insurance Plan',
-            },
-            unit_amount: 1000, // $10.00
-          },
+          price: 'price_1Q8pNxGDDWAeQTzJ7sjocNYN', // Ensure this price ID exists
           quantity: 1,
         },
       ],
@@ -28,9 +27,10 @@ module.exports = async (req, res) => {
       },
     });
 
+    console.log('✅ Checkout session created successfully:', session.id);
     res.status(200).json({ id: session.id });
   } catch (err) {
-    console.error('Error creating Stripe session:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('❌ Error creating Stripe session:', err.message);
+    res.status(500).json({ error: 'Internal Server Error', message: err.message });
   }
 };

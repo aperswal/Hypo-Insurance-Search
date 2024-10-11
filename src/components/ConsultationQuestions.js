@@ -326,6 +326,8 @@ const ConsultationQuestions = ({ onComplete }) => {
   const handleComplete = async () => {
     try {
       const stripe = await stripePromise;
+  
+      // Call your server to create a Checkout Session
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -333,21 +335,24 @@ const ConsultationQuestions = ({ onComplete }) => {
         },
         body: JSON.stringify({ answers }),
       });
-
+  
+      // Check for response status
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error creating checkout session:', errorData);
         setError('Failed to create checkout session. Please try again.');
         return;
       }
-
+  
+      // Parse the session data
       const session = await response.json();
-
+  
       // Redirect to Stripe Checkout
       const result = await stripe.redirectToCheckout({
         sessionId: session.id,
       });
-
+  
+      // Handle error during the redirect
       if (result.error) {
         console.error(result.error.message);
         setError(result.error.message);
@@ -357,6 +362,7 @@ const ConsultationQuestions = ({ onComplete }) => {
       setError('An unexpected error occurred. Please try again.');
     }
   };
+  
 
   const formatCurrency = (value) => {
     const number = parseFloat(value);

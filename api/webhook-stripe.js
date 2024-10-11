@@ -1,67 +1,104 @@
-// api/webhook-stripe.js
+// webhook-stripe.js
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { MongoClient, ServerApiVersion } = require('mongodb');
+import { buffer } from 'micro';
+import Stripe from 'stripe';
+import { MongoClient } from 'mongodb';
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-const mongodbUri = process.env.MONGODB_URI; // Ensure this includes your database name
+const mongodbUri = process.env.MONGODB_URI;
 
-module.exports = async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
-  // Verify the Stripe webhook signature
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    console.log('✅ Successfully verified webhook signature.');
-  } catch (err) {
-    console.error('❌ Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+export default async (req, res) => {
+  if (req.method === 'POST') {
+    let event;
+    const sig = req.headers['stripe-signature'];
 
-  console.log('🔔 Event received:', event.type);
-
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    console.log('💳 Payment was successful!');
-    const answers = JSON.parse(session.metadata.answers);
-
-    // Store in MongoDB
     try {
-      // Create a new MongoClient with the updated options
-      const client = new MongoClient(mongodbUri, {
-        serverApi: {
-          version: ServerApiVersion.v1,
-          strict: true,
-          deprecationErrors: true,
-        }
-      });
-
-      // Connect to MongoDB
-      await client.connect();
-      console.log('✅ Connected to MongoDB.');
-
-      // Access the database and collection
-      const database = client.db('HypoInsuranceSearch'); // Ensure this matches your DB name
-      const collection = database.collection('consultations'); // The collection you want to use
-
-      // Insert the document
-      await collection.insertOne({
-        sessionId: session.id,
-        customerEmail: session.customer_details.email,
-        answers,
-        paymentStatus: session.payment_status,
-        createdAt: new Date(),
-      });
-      console.log('✅ Data successfully stored in MongoDB.');
-
-      // Close the connection
-      await client.close();
+      const buf = await buffer(req);
+      const rawBody = buf.toString('utf8');
+      event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
     } catch (err) {
-      console.error('❌ Error storing data in MongoDB:', err);
-      return res.status(500).send('Internal Server Error');
+      console.error('❌ Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-  }
 
-  res.status(200).send('Received');
+    console.log('🔔 Event received:', event.type);
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      console.log('💳 Payment was successful!');
+      console.log('Session details:', JSON.stringify(session, null, 2));
+      
+      let answers;
+      try {
+        answers = JSON.parse(session.metadata.answers);
+        console.log('Parsed answers:', JSON.stringify(answers, null, 2));
+      } catch (err) {
+        console.error('❌ Error parsing answers:', err.message);
+        return res.status(400).send(`Error parsing answers: ${err.message}`);
+      }
+
+      const client = new MongoClient(mongodbUri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      });
+
+      try {
+        console.log('Attempting to connect to MongoDB...');
+        await client.connect();
+        console.log('✅ Connected to MongoDB.');
+
+        const database = client.db('HypoInsuranceSearch');
+        const collection = database.collection('consultations');
+
+        console.log('Database and collection selected:', database.databaseName, collection.collectionName);
+
+        const consultationData = {
+          sessionId: session.id,
+          customerEmail: session.customer_details.email,
+          answers: answers,
+          paymentStatus: session.payment_status,
+          createdAt: new Date(),
+        };
+
+        console.log('Consultation data to be stored:', JSON.stringify(consultationData, null, 2));
+
+        // Use updateOne with upsert option to update or insert based on email
+        const result = await collection.updateOne(
+          { customerEmail: session.customer_details.email },
+          { $set: consultationData },
+          { upsert: true }
+        );
+
+        console.log('MongoDB operation result:', JSON.stringify(result, null, 2));
+
+        if (result.matchedCount > 0) {
+          console.log('✅ Document updated successfully');
+        } else if (result.upsertedCount > 0) {
+          console.log('✅ New document inserted successfully');
+        } else {
+          console.log('⚠️ Document was not updated or inserted');
+        }
+      } catch (err) {
+        console.error('❌ Error storing data in MongoDB:', err);
+        console.error('Error stack:', err.stack);
+        return res.status(500).send('Internal Server Error');
+      } finally {
+        console.log('Closing MongoDB connection...');
+        await client.close();
+        console.log('MongoDB connection closed.');
+      }
+    }
+
+    res.status(200).send('Received');
+  } else {
+    res.setHeader('Allow', 'POST');
+    res.status(405).send('Method Not Allowed');
+  }
 };
