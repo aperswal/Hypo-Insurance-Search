@@ -1,19 +1,40 @@
-import React, { useState, useEffect } from 'react';
+// src/components/ConsultationQuestions.js
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, Typography, Button, TextField, Radio, RadioGroup, 
   FormControlLabel, FormControl, FormLabel, LinearProgress, 
-  Chip, InputAdornment, Select, MenuItem, IconButton, 
-  List, ListItem, ListItemIcon, ListItemText,
+  Chip, InputAdornment, Select, MenuItem, List, ListItem, ListItemIcon, ListItemText,
   Snackbar, Alert
 } from '@mui/material';
+
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CheckIcon from '@mui/icons-material/Check';
+
+import { loadStripe } from '@stripe/stripe-js';
+
+// Initialize Stripe with your publishable key
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const ConsultationQuestions = ({ onComplete }) => {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [error, setError] = useState('');
   const [showFinalPage, setShowFinalPage] = useState(false);
+
+  const handleAnswer = (id, value, memberIndex = -1) => {
+    setAnswers(prevAnswers => {
+      if (memberIndex === -1) {
+        return { ...prevAnswers, [id]: value };
+      } else {
+        const updatedMembers = [...(prevAnswers.householdMembers || [])];
+        if (!updatedMembers[memberIndex]) {
+          updatedMembers[memberIndex] = {};
+        }
+        updatedMembers[memberIndex] = { ...updatedMembers[memberIndex], [id]: value };
+        return { ...prevAnswers, householdMembers: updatedMembers };
+      }
+    });
+  };
 
   const mainQuestions = [
     { 
@@ -237,55 +258,8 @@ const ConsultationQuestions = ({ onComplete }) => {
     }
   ];
 
-  const handleAnswer = (id, value, memberIndex = -1) => {
-    setAnswers(prevAnswers => {
-      const newAnswers = { ...prevAnswers };
-      if (memberIndex === -1) {
-        newAnswers[id] = value;
-      } else {
-        if (!newAnswers.householdMembers) {
-          newAnswers.householdMembers = [];
-        }
-        if (!newAnswers.householdMembers[memberIndex]) {
-          newAnswers.householdMembers[memberIndex] = {};
-        }
-        newAnswers.householdMembers[memberIndex][id] = value;
-      }
-
-      // Handle follow-up questions
-      if (id === 'prescriptionDrugs' && value === 'Yes') {
-        if (memberIndex === -1) {
-          newAnswers.prescriptionDrugsList = '';
-        } else {
-          newAnswers.householdMembers[memberIndex].prescriptionDrugsList = '';
-        }
-      } else if (id === 'prescriptionDrugs' && value === 'No') {
-        if (memberIndex === -1) {
-          delete newAnswers.prescriptionDrugsList;
-        } else {
-          delete newAnswers.householdMembers[memberIndex].prescriptionDrugsList;
-        }
-      }
-
-      if (id === 'specialNeeds' && value === 'Yes') {
-        if (memberIndex === -1) {
-          newAnswers.specialNeedsList = '';
-        } else {
-          newAnswers.householdMembers[memberIndex].specialNeedsList = '';
-        }
-      } else if (id === 'specialNeeds' && value === 'No') {
-        if (memberIndex === -1) {
-          delete newAnswers.specialNeedsList;
-        } else {
-          delete newAnswers.householdMembers[memberIndex].specialNeedsList;
-        }
-      }
-
-      return newAnswers;
-    });
-  };
-
-  const handleNext = () => {
+  // Memoize handleNext to prevent unnecessary re-renders and to satisfy useEffect dependencies
+  const handleNext = useCallback(() => {
     const currentQuestions = step < mainQuestions.length ? mainQuestions :
                              step < mainQuestions.length + personalQuestions.length ? personalQuestions :
                              memberQuestions;
@@ -335,264 +309,294 @@ const ConsultationQuestions = ({ onComplete }) => {
     const totalQuestions = mainQuestions.length + personalQuestions.length +
                            (answers.householdSize ? (answers.householdSize - 1) * memberQuestions.length : 0);
 
-                           if (step < totalQuestions - 1) {
-                            setStep(step + 1);
-                          } else {
-                            setShowFinalPage(true);
-                          }
-                          setError('');
-                        };
-                      
-                        const handleBack = () => {
-                          if (step > 0) {
-                            setStep(step - 1);
-                          }
-                        };
-                      
-                        const handlePayment = () => {
-                          console.log('Payment button clicked. Answers:', answers);
-                          onComplete(answers);
-                        };
-                      
-                        const formatCurrency = (value) => {
-                          const number = parseFloat(value);
-                          return isNaN(number) ? '' : number.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
-                        };
-                      
-                        const handleCurrencyChange = (e, id, memberIndex = -1) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          handleAnswer(id, value, memberIndex);
-                        };
-                      
-                        useEffect(() => {
-                          const handleKeyPress = (event) => {
-                            if (event.key === 'Enter') {
-                              handleNext();
-                            }
-                          };
-                      
-                          window.addEventListener('keypress', handleKeyPress);
-                      
-                          return () => {
-                            window.removeEventListener('keypress', handleKeyPress);
-                          };
-                        }, [step, answers]);
-                      
-                        const renderQuestionContent = () => {
-                          const currentQuestions = step < mainQuestions.length ? mainQuestions :
-                                                   step < mainQuestions.length + personalQuestions.length ? personalQuestions :
-                                                   memberQuestions;
-                          const currentQuestion = currentQuestions[step % currentQuestions.length];
-                      
-                          if (!currentQuestion) {
-                            return null;
-                          }
-                      
-                          const memberIndex = step >= mainQuestions.length + personalQuestions.length ?
-                                              Math.floor((step - mainQuestions.length - personalQuestions.length) / memberQuestions.length) :
-                                              -1;
-                      
-                          const currentAnswer = memberIndex === -1 ? answers[currentQuestion.id] :
-                                                answers.householdMembers && answers.householdMembers[memberIndex] ?
-                                                answers.householdMembers[memberIndex][currentQuestion.id] : undefined;
-                      
-                          return (
-                            <Box sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
-                              <Typography variant="h5" gutterBottom>
-                                {memberIndex === -1 ? "Your Information" : `Household Member ${memberIndex + 2}`}
-                              </Typography>
-                              <FormControl component="fieldset" sx={{ mt: 2, width: '100%' }}>
-                                <FormLabel component="legend">{currentQuestion.question}</FormLabel>
-                                {currentQuestion.type === 'radio' ? (
-                                  <RadioGroup
-                                    value={currentAnswer || ''}
-                                    onChange={(e) => handleAnswer(currentQuestion.id, e.target.value, memberIndex)}
-                                  >
-                                    {currentQuestion.options.map(option => (
-                                      <FormControlLabel key={option} value={option} control={<Radio />} label={option} />
-                                    ))}
-                                  </RadioGroup>
-                                ) : currentQuestion.type === 'select' ? (
-                                  <Select
-                                    value={currentAnswer || ''}
-                                    onChange={(e) => handleAnswer(currentQuestion.id, e.target.value, memberIndex)}
-                                    fullWidth
-                                    sx={{ mt: 1 }}
-                                  >
-                                    {currentQuestion.options.map(option => (
-                                      <MenuItem key={option} value={option}>{option}</MenuItem>
-                                    ))}
-                                  </Select>
-                                ) : currentQuestion.type === 'number' && currentQuestion.format === 'currency' ? (
-                                  <TextField
-                                    fullWidth
-                                    type="text"
-                                    value={formatCurrency(currentAnswer || '')}
-                                    onChange={(e) => handleCurrencyChange(e, currentQuestion.id, memberIndex)}
-                                    InputProps={{
-                                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                                    }}
-                                    sx={{ mt: 1 }}
-                                  />
-                                ) : (
-                                  <TextField
-                                    fullWidth
-                                    type={currentQuestion.type}
-                                    value={currentAnswer || ''}
-                                    onChange={(e) => handleAnswer(currentQuestion.id, e.target.value, memberIndex)}
-                                    sx={{ mt: 1 }}
-                                  />
-                                )}
-                              </FormControl>
-                              
-                              {/* Render follow-up questions if applicable */}
-                              {currentQuestion.id === 'prescriptionDrugs' && currentAnswer === 'Yes' && (
-                                <TextField
-                                  fullWidth
-                                  multiline
-                                  rows={4}
-                                  label="Please list the prescription medications:"
-                                  value={memberIndex === -1 ? answers.prescriptionDrugsList || '' : 
-                                         answers.householdMembers[memberIndex].prescriptionDrugsList || ''}
-                                  onChange={(e) => handleAnswer('prescriptionDrugsList', e.target.value, memberIndex)}
-                                  sx={{ mt: 2 }}
-                                />
-                              )}
-                              {currentQuestion.id === 'specialNeeds' && currentAnswer === 'Yes' && (
-                                <TextField
-                                  fullWidth
-                                  multiline
-                                  rows={4}
-                                  label="Please describe the special medical coverage needs:"
-                                  value={memberIndex === -1 ? answers.specialNeedsList || '' : 
-                                         answers.householdMembers[memberIndex].specialNeedsList || ''}
-                                  onChange={(e) => handleAnswer('specialNeedsList', e.target.value, memberIndex)}
-                                  sx={{ mt: 2 }}
-                                />
-                              )}
-                      
-                              {currentAnswer && (
-                                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', color: 'success.main' }}>
-                                  <CheckCircleOutlineIcon sx={{ mr: 1 }} />
-                                  <Typography variant="body2">{currentQuestion.reward}</Typography>
-                                </Box>
-                              )}
-                              <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic', color: 'text.secondary' }}>
-                                Why we ask: {currentQuestion.reason}
-                              </Typography>
-                            </Box>
-                          );
-                        };
-                      
-                        const renderFinalPage = () => (
-                          <Box sx={{ p: 3, maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
-                            <Typography variant="h4" gutterBottom>
-                              You're One Step Away from Saving Hundreds on Your Health Insurance
-                            </Typography>
-                            <Typography variant="h6" sx={{ mb: 3 }}>
-                              Unlock Your Personalized Health Insurance Plan for Just $10
-                            </Typography>
-                            <Typography variant="body1" paragraph>
-                              Are you tired of:
-                            </Typography>
-                            <List>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="error" /></ListItemIcon>
-                                <ListItemText primary="Overpaying for health insurance that doesn't fit your needs?" />
-                              </ListItem>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="error" /></ListItemIcon>
-                                <ListItemText primary="Spending hours comparing complex insurance plans?" />
-                              </ListItem>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="error" /></ListItemIcon>
-                                <ListItemText primary="Worrying about unexpected medical costs?" />
-                              </ListItem>
-                            </List>
-                            <Typography variant="body1" paragraph sx={{ mt: 3 }}>
-                              For just $10, you'll receive:
-                            </Typography>
-                            <List>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
-                                <ListItemText primary="A personalized report of the best insurance plans for your unique situation" />
-                              </ListItem>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
-                                <ListItemText primary="Potential savings of hundreds of dollars on your monthly premiums" />
-                              </ListItem>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
-                                <ListItemText primary="Expert analysis that could save you thousands in out-of-pocket costs" />
-                              </ListItem>
-                              <ListItem>
-                                <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
-                                <ListItemText primary="Peace of mind knowing you have the right coverage for you and your family" />
-                              </ListItem>
-                            </List>
-                            <Typography variant="body1" sx={{ mt: 3, fontWeight: 'bold' }}>
-                              Don't miss this opportunity to secure the best health insurance for your needs and budget.
-                            </Typography>
-                            <Button 
-                              onClick={handlePayment} 
-                              variant="contained" 
-                              color="primary" 
-                              size="large"
-                              sx={{ 
-                                mt: 4,
-                                minWidth: 200, 
-                                fontSize: '1.1rem',
-                                fontWeight: 'bold',
-                                textTransform: 'none'
-                              }}
-                            >
-                              Get Your Personalized Plan for $10
-                            </Button>
-                          </Box>
-                        );
-                      
-                        const totalQuestions = mainQuestions.length + personalQuestions.length +
-                                               (answers.householdSize ? (answers.householdSize - 1) * memberQuestions.length : 0);
-                      
-                        return (
-                          <Box sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
-                            {showFinalPage ? renderFinalPage() : renderQuestionContent()}
-                            {!showFinalPage && (
-                              <>
-                                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-                                  <Button onClick={handleBack} variant="outlined" disabled={step === 0}>
-                                    Back
-                                  </Button>
-                                  <Button onClick={handleNext} variant="contained">
-                                    {step < totalQuestions - 1 ? 'Next' : 'Finish'}
-                                  </Button>
-                                </Box>
-                                <Box sx={{ mt: 4 }}>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={(step + 1) / totalQuestions * 100}
-                                  />
-                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', mt: 1 }}>
-                                    {[...Array(totalQuestions)].map((_, index) => (
-                                      <Chip
-                                        key={index}
-                                        label={index + 1}
-                                        color={index <= step ? 'primary' : 'default'}
-                                        size="small"
-                                        sx={{ m: 0.5 }}
-                                      />
-                                    ))}
-                                  </Box>
-                                </Box>
-                              </>
-                            )}
-                            <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError('')}>
-                              <Alert onClose={() => setError('')} severity="error" sx={{ width: '100%' }}>
-                                {error}
-                              </Alert>
-                            </Snackbar>
-                          </Box>
-                        );
-                      };
-                      
-                      export default ConsultationQuestions;
+    if (step < totalQuestions - 1) {
+      setStep(step + 1);
+    } else {
+      setShowFinalPage(true);
+    }
+    setError('');
+  }, [step, answers]);
+
+  const handleBack = () => {
+    if (step > 0) {
+      setStep(step - 1);
+    }
+  };
+
+  const handleComplete = async () => {
+    try {
+      const stripe = await stripePromise;
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ answers }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error creating checkout session:', errorData);
+        setError('Failed to create checkout session. Please try again.');
+        return;
+      }
+
+      const session = await response.json();
+
+      // Redirect to Stripe Checkout
+      const result = await stripe.redirectToCheckout({
+        sessionId: session.id,
+      });
+
+      if (result.error) {
+        console.error(result.error.message);
+        setError(result.error.message);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setError('An unexpected error occurred. Please try again.');
+    }
+  };
+
+  const formatCurrency = (value) => {
+    const number = parseFloat(value);
+    return isNaN(number) ? '' : number.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
+
+  const handleCurrencyChange = (e, id, memberIndex = -1) => {
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    handleAnswer(id, value, memberIndex);
+  };
+
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (event.key === 'Enter') {
+        handleNext();
+      }
+    };
+
+    window.addEventListener('keypress', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('keypress', handleKeyPress);
+    };
+  }, [handleNext]);
+
+  const renderQuestionContent = () => {
+    const currentQuestions = step < mainQuestions.length ? mainQuestions :
+                             step < mainQuestions.length + personalQuestions.length ? personalQuestions :
+                             memberQuestions;
+    const currentQuestion = currentQuestions[step % currentQuestions.length];
+
+    if (!currentQuestion) {
+      return null;
+    }
+
+    const memberIndex = step >= mainQuestions.length + personalQuestions.length ?
+                        Math.floor((step - mainQuestions.length - personalQuestions.length) / memberQuestions.length) :
+                        -1;
+
+    const currentAnswer = memberIndex === -1 ? answers[currentQuestion.id] :
+                          answers.householdMembers && answers.householdMembers[memberIndex] ?
+                          answers.householdMembers[memberIndex][currentQuestion.id] : undefined;
+
+    return (
+      <Box sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
+        <Typography variant="h5" gutterBottom>
+          {memberIndex === -1 ? "Your Information" : `Household Member ${memberIndex + 2}`}
+        </Typography>
+        <FormControl component="fieldset" sx={{ mt: 2, width: '100%' }}>
+          <FormLabel component="legend">{currentQuestion.question}</FormLabel>
+          {currentQuestion.type === 'radio' ? (
+            <RadioGroup
+              value={currentAnswer || ''}
+              onChange={(e) => handleAnswer(currentQuestion.id, e.target.value, memberIndex)}
+            >
+              {currentQuestion.options.map(option => (
+                <FormControlLabel key={option} value={option} control={<Radio />} label={option} />
+              ))}
+            </RadioGroup>
+          ) : currentQuestion.type === 'select' ? (
+            <Select
+              value={currentAnswer || ''}
+              onChange={(e) => handleAnswer(currentQuestion.id, e.target.value, memberIndex)}
+              fullWidth
+              sx={{ mt: 1 }}
+            >
+              {currentQuestion.options.map(option => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
+            </Select>
+          ) : currentQuestion.type === 'number' && currentQuestion.format === 'currency' ? (
+            <TextField
+              fullWidth
+              type="text"
+              value={formatCurrency(currentAnswer || '')}
+              onChange={(e) => handleCurrencyChange(e, currentQuestion.id, memberIndex)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              }}
+              sx={{ mt: 1 }}
+            />
+          ) : (
+            <TextField
+              fullWidth
+              type={currentQuestion.type}
+              value={currentAnswer || ''}
+              onChange={(e) => handleAnswer(currentQuestion.id, e.target.value, memberIndex)}
+              sx={{ mt: 1 }}
+            />
+          )}
+        </FormControl>
+        
+        {/* Render follow-up questions if applicable */}
+        {currentQuestion.id === 'prescriptionDrugs' && currentAnswer === 'Yes' && (
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Please list the prescription medications:"
+            value={memberIndex === -1 ? answers.prescriptionDrugsList || '' : 
+                   answers.householdMembers[memberIndex].prescriptionDrugsList || ''}
+            onChange={(e) => handleAnswer('prescriptionDrugsList', e.target.value, memberIndex)}
+            sx={{ mt: 2 }}
+          />
+        )}
+        {currentQuestion.id === 'specialNeeds' && currentAnswer === 'Yes' && (
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Please describe the special medical coverage needs:"
+            value={memberIndex === -1 ? answers.specialNeedsList || '' : 
+                  answers.householdMembers[memberIndex].specialNeedsList || ''}
+            onChange={(e) => handleAnswer('specialNeedsList', e.target.value, memberIndex)}
+            sx={{ mt: 2 }}
+          />
+        )}
+
+        {currentAnswer && (
+          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', color: 'success.main' }}>
+            <CheckCircleOutlineIcon sx={{ mr: 1 }} />
+            <Typography variant="body2">{currentQuestion.reward}</Typography>
+          </Box>
+        )}
+        <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic', color: 'text.secondary' }}>
+          Why we ask: {currentQuestion.reason}
+        </Typography>
+      </Box>
+    );
+  };
+
+  const renderFinalPage = () => (
+    <Box sx={{ p: 3, maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
+      <Typography variant="h4" gutterBottom>
+        You're One Step Away from Saving Hundreds on Your Health Insurance
+      </Typography>
+      <Typography variant="h6" sx={{ mb: 3 }}>
+        Unlock Your Personalized Health Insurance Plan for Just $10
+      </Typography>
+      <Typography variant="body1" paragraph>
+        Are you tired of:
+      </Typography>
+      <List>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="error" /></ListItemIcon>
+          <ListItemText primary="Overpaying for health insurance that doesn't fit your needs?" />
+        </ListItem>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="error" /></ListItemIcon>
+          <ListItemText primary="Spending hours comparing complex insurance plans?" />
+        </ListItem>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="error" /></ListItemIcon>
+          <ListItemText primary="Worrying about unexpected medical costs?" />
+        </ListItem>
+      </List>
+      <Typography variant="body1" paragraph sx={{ mt: 3 }}>
+        For just $10, you'll receive:
+      </Typography>
+      <List>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
+          <ListItemText primary="A personalized report of the best insurance plans for your unique situation" />
+        </ListItem>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
+          <ListItemText primary="Potential savings of hundreds of dollars on your monthly premiums" />
+        </ListItem>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
+          <ListItemText primary="Expert analysis that could save you thousands in out-of-pocket costs" />
+        </ListItem>
+        <ListItem>
+          <ListItemIcon><CheckIcon color="success" /></ListItemIcon>
+          <ListItemText primary="Peace of mind knowing you have the right coverage for you and your family" />
+        </ListItem>
+      </List>
+      <Typography variant="body1" sx={{ mt: 3, fontWeight: 'bold' }}>
+        Don't miss this opportunity to secure the best health insurance for your needs and budget.
+      </Typography>
+      <Button 
+        onClick={handleComplete} 
+        variant="contained" 
+        color="primary" 
+        size="large"
+        sx={{ 
+          mt: 4,
+          minWidth: 200, 
+          fontSize: '1.1rem',
+          fontWeight: 'bold',
+          textTransform: 'none'
+        }}
+      >
+        Get Your Personalized Plan for $10
+      </Button>
+    </Box>
+  );
+
+  const totalQuestions = mainQuestions.length + personalQuestions.length +
+                         (answers.householdSize ? (answers.householdSize - 1) * memberQuestions.length : 0);
+
+  return (
+    <Box sx={{ p: 3, maxWidth: 600, mx: 'auto' }}>
+      {showFinalPage ? renderFinalPage() : renderQuestionContent()}
+      {!showFinalPage && (
+        <>
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+            <Button onClick={handleBack} variant="outlined" disabled={step === 0}>
+              Back
+            </Button>
+            <Button onClick={handleNext} variant="contained">
+              {step < totalQuestions - 1 ? 'Next' : 'Finish'}
+            </Button>
+          </Box>
+          <Box sx={{ mt: 4 }}>
+            <LinearProgress
+              variant="determinate"
+              value={(step + 1) / totalQuestions * 100}
+            />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', mt: 1 }}>
+              {[...Array(totalQuestions)].map((_, index) => (
+                <Chip
+                  key={index}
+                  label={index + 1}
+                  color={index <= step ? 'primary' : 'default'}
+                  size="small"
+                  sx={{ m: 0.5 }}
+                />
+              ))}
+            </Box>
+          </Box>
+        </>
+      )}
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError('')}>
+        <Alert onClose={() => setError('')} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default ConsultationQuestions;

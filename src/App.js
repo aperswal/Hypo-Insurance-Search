@@ -1,30 +1,37 @@
+// src/App.js
+
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, Box, CircularProgress, Grid, List, ListItem, ListItemText } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { Container, Typography, Box, CircularProgress, Grid } from '@mui/material';
 import InsuranceSearchForm from './components/InsuranceSearchForm';
 import InsuranceFilterComponent from './components/InsuranceFilterComponent';
 import InsuranceSortComponent from './components/InsuranceSortComponent';
 import InsurancePlanList from './components/InsurancePlanList';
 import InsuranceConsultationBox from './components/InsuranceConsultationBox';
 import ConsultationQuestions from './components/ConsultationQuestions';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
+import Success from './pages/Success';
+import Cancel from './pages/Cancel';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#f50057',
-    },
-  },
-});
 
 function App() {
-  
   const [consultationAnswers, setConsultationAnswers] = useState(null);
   const [showConsultation, setShowConsultation] = useState(false);
-  const [insuranceCompanies, setInsuranceCompanies] = useState(null);
+
+  const [insurancePlans, setInsurancePlans] = useState(null);
+  const [filteredInsurancePlans, setFilteredInsurancePlans] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [minPremium, setMinPremium] = useState(0);
+  const [maxPremium, setMaxPremium] = useState(2000);
+  const [minDeductible, setMinDeductible] = useState(0);
+  const [maxDeductible, setMaxDeductible] = useState(10000);
+
+  const [insuranceFilterOptions, setInsuranceFilterOptions] = useState({
+    issuers: [],
+    planTypes: [],
+    metalLevels: []
+  });
 
   const handleStartConsultation = () => {
     setShowConsultation(true);
@@ -42,56 +49,56 @@ function App() {
   };
 
   const fetchInsurancePlansFromConsultation = async (answers) => {
-  setLoading(true);
-  setError(null);
-  try {
-    const requestBody = {
-      zipCode: answers.zipCode,
-      income: answers.income,
-      householdSize: answers.householdSize,
-      age: answers.age,
-      gender: answers.gender,
-      tobacco: answers.tobacco === 'Yes',
-      coverageYear: answers.coverageYear,
-      market: answers.market,
-      aptcEligible: answers.aptcEligible === 'Yes'
-    };
+    setLoading(true);
+    setError(null);
+    try {
+      const requestBody = {
+        zipCode: answers.zipCode,
+        income: answers.income,
+        householdSize: answers.householdSize,
+        age: answers.age,
+        gender: answers.gender,
+        tobacco: answers.tobacco === 'Yes',
+        coverageYear: answers.coverageYear,
+        market: answers.market,
+        aptcEligible: answers.aptcEligible === 'Yes'
+      };
 
-    console.log('CMS API Request Body:', requestBody); // Debugging
+      console.log('CMS API Request Body:', requestBody); // Debugging
 
-    const response = await fetch('/api/insurance-plans', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+      const response = await fetch('/api/insurance-plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-    const data = await response.json();
-    console.log('CMS API Response:', data); // Debugging
+      const data = await response.json();
+      console.log('CMS API Response:', data); // Debugging
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(data)}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(data)}`);
+      }
+
+      if (!data.plans || !Array.isArray(data.plans)) {
+        throw new Error('Invalid response format: plans array is missing or not an array');
+      }
+
+      setInsurancePlans(data.plans);
+      setFilteredInsurancePlans(data.plans);
+
+      // Update filter options based on the new plans
+      updateFilterOptions(data.plans);
+    } catch (error) {
+      console.error('Error fetching insurance plans:', error);
+      setError(`An error occurred while fetching insurance plans: ${error.message}`);
+      setInsurancePlans(null);
+      setFilteredInsurancePlans(null);
+    } finally {
+      setLoading(false);
     }
-
-    if (!data.plans || !Array.isArray(data.plans)) {
-      throw new Error('Invalid response format: plans array is missing or not an array');
-    }
-
-    setInsurancePlans(data.plans);
-    setFilteredInsurancePlans(data.plans);
-
-    // Update filter options based on the new plans
-    updateFilterOptions(data.plans);
-  } catch (error) {
-    console.error('Error fetching insurance plans:', error);
-    setError(`An error occurred while fetching insurance plans: ${error.message}`);
-    setInsurancePlans(null);
-    setFilteredInsurancePlans(null);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const updateFilterOptions = (plans) => {
     const issuers = [...new Set(plans.map(plan => plan.issuer.name))];
@@ -107,32 +114,6 @@ function App() {
     setMinDeductible(Math.min(...deductibles));
     setMaxDeductible(Math.max(...deductibles));
   };
-
-
-
-  const [insurancePlans, setInsurancePlans] = useState(null);
-  const [filteredInsurancePlans, setFilteredInsurancePlans] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [minPremium, setMinPremium] = useState(0);
-  const [maxPremium, setMaxPremium] = useState(2000);
-  const [minDeductible, setMinDeductible] = useState(0);
-  const [maxDeductible, setMaxDeductible] = useState(10000);
-  const [insuranceSortCriteria, setInsuranceSortCriteria] = useState('');
-  
-  // Use the correct environment variable name
-  const API_BASE_URL = process.env.REACT_APP_API_GATEWAY_URL;
-
-  
-
-  console.log('API_BASE_URL:', API_BASE_URL); // Debugging: Log the API URL
-
-  const [insuranceFilterOptions, setInsuranceFilterOptions] = useState({
-    issuers: [],
-    planTypes: [],
-    metalLevels: []
-  });
-
 
   useEffect(() => {
     if (insurancePlans) {
@@ -199,7 +180,8 @@ function App() {
   };
 
   const handleInsuranceSort = (criteria) => {
-    setInsuranceSortCriteria(criteria);
+    // Removed usage of insuranceSortCriteria
+    // setInsuranceSortCriteria(criteria);
     const sorted = [...filteredInsurancePlans].sort((a, b) => {
       switch (criteria) {
         case 'premium_asc':
@@ -220,105 +202,98 @@ function App() {
   };
 
   return (
-    <Container maxWidth="md" className="App">
-      <Box className="app-header">
-        <Typography variant="h3" component="h1" className="app-title">
-          Find Your Perfect Insurance Plan
-        </Typography>
-        <Typography variant="h6" className="app-subtitle">
-          Compare top-rated plans and save on your health insurance
-        </Typography>
-      </Box>
-      
-      {!showConsultation && (
-        <>
-          <Box className="search-form-container">
-            <InsuranceSearchForm onSubmit={handleInsuranceSearch} />
-          </Box>
-    
-          {insurancePlans && (
-            <Box className="results-container">
-              <Typography variant="h5" gutterBottom className="customize-results">
-                Customize Your Results
-              </Typography>
-              <Grid container spacing={2} className="filter-sort-container">
-                <Grid item xs={12}>
-                  <InsuranceFilterComponent
-                    onFilterChange={handleInsuranceFilterChange}
-                    filterOptions={insuranceFilterOptions}
-                    minPremium={minPremium}
-                    maxPremium={maxPremium}
-                    minDeductible={minDeductible}
-                    maxDeductible={maxDeductible}
+    <Router>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Container maxWidth="md" className="App">
+              <Box className="app-header">
+                <Typography variant="h3" component="h1" className="app-title">
+                  Find Your Perfect Insurance Plan
+                </Typography>
+                <Typography variant="h6" className="app-subtitle">
+                  Compare top-rated plans and save on your health insurance
+                </Typography>
+              </Box>
+
+              {!showConsultation && (
+                <>
+                  <Box className="search-form-container">
+                    <InsuranceSearchForm onSubmit={handleInsuranceSearch} />
+                  </Box>
+
+                  {insurancePlans && (
+                    <Box className="results-container">
+                      <Typography variant="h5" gutterBottom className="customize-results">
+                        Customize Your Results
+                      </Typography>
+                      <Grid container spacing={2} className="filter-sort-container">
+                        <Grid item xs={12}>
+                          <InsuranceFilterComponent
+                            onFilterChange={handleInsuranceFilterChange}
+                            filterOptions={insuranceFilterOptions}
+                            minPremium={minPremium}
+                            maxPremium={maxPremium}
+                            minDeductible={minDeductible}
+                            maxDeductible={maxDeductible}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <InsuranceSortComponent onSortChange={handleInsuranceSort} />
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  )}
+
+                  {loading && (
+                    <Box className="loading-container">
+                      <CircularProgress />
+                    </Box>
+                  )}
+
+                  {error && (
+                    <Box className="error-container">
+                      <Typography color="error">{error}</Typography>
+                    </Box>
+                  )}
+
+                  {filteredInsurancePlans && (
+                    <Box className="available-plans">
+                      <Typography variant="h5" gutterBottom>
+                        Available Plans
+                      </Typography>
+                      <InsurancePlanList plans={filteredInsurancePlans} />
+                    </Box>
+                  )}
+
+                  <Box className="help-text">
+                    <Typography variant="body1">
+                      Need help choosing a plan? Our experts are just a call away.
+                    </Typography>
+                  </Box>
+                </>
+              )}
+
+              {showConsultation && (
+                <Box className="consultation-container">
+                  <ConsultationQuestions
+                    onClose={handleCloseConsultation}
+                    onComplete={handleConsultationComplete}
                   />
-                </Grid>
-                <Grid item xs={12}>
-                  <InsuranceSortComponent onSortChange={handleInsuranceSort} />
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-    
-          {loading && (
-            <Box className="loading-container">
-              <CircularProgress />
-            </Box>
-          )}
-    
-          {error && (
-            <Box className="error-container">
-              <Typography>{error}</Typography>
-            </Box>
-          )}
-    
-          {filteredInsurancePlans && (
-            <Box className="available-plans">
-              <Typography variant="h5" gutterBottom>
-                Available Plans
-              </Typography>
-              <InsurancePlanList plans={filteredInsurancePlans} />
-            </Box>
-          )}
-    
-          {insuranceCompanies && (
-            <Box className="available-companies">
-              <Typography variant="h5" gutterBottom>
-                Recommended Insurance Companies
-              </Typography>
-              <List>
-                {insuranceCompanies.map((company, index) => (
-                  <ListItem key={index}>
-                    <ListItemText 
-                      primary={company.name}
-                      secondary={`Rating: ${company.rating}, Plans available: ${company.planCount}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
-    
-          <Box className="help-text">
-            <Typography variant="body1">
-              Need help choosing a plan? Our experts are just a call away.
-            </Typography>
-          </Box>
-        </>
-      )}
-  
-      {showConsultation && (
-        <Box className="consultation-container">
-          <ConsultationQuestions 
-            onClose={handleCloseConsultation} 
-            onComplete={handleConsultationComplete}
-          />
-        </Box>
-      )}
-  
-      {!showConsultation && !consultationAnswers && (
-        <InsuranceConsultationBox onStartConsultation={handleStartConsultation} />
-      )}
-    </Container>
+                </Box>
+              )}
+
+              {!showConsultation && !consultationAnswers && (
+                <InsuranceConsultationBox onStartConsultation={handleStartConsultation} />
+              )}
+            </Container>
+          }
+        />
+        <Route path="/success" element={<Success />} />
+        <Route path="/cancel" element={<Cancel />} />
+      </Routes>
+    </Router>
   );
 }
 
