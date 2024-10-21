@@ -15,9 +15,7 @@ export default async (req, res) => {
   if (req.method === 'POST') {
     let event;
     const sig = req.headers['stripe-signature'];
-    console.log('Webhook received');
-    console.log('Request headers:', JSON.stringify(req.headers, null, 2));
-
+    
     try {
       const buf = await buffer(req);
       const rawBody = buf.toString('utf8');
@@ -25,29 +23,19 @@ export default async (req, res) => {
       console.log('✅ Webhook signature verified.');
     } catch (err) {
       console.error('❌ Webhook signature verification failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
 
     console.log('Event type:', event.type);
-    console.log('Event data:', JSON.stringify(event.data, null, 2));
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       console.log('💳 Payment was successful!');
-      console.log('Session details:', JSON.stringify(session, null, 2));
-      console.log('Session metadata:', JSON.stringify(session.metadata, null, 2));
 
-      let answers;
       try {
-        answers = JSON.parse(session.metadata.answers);
+        const answers = JSON.parse(session.metadata.answers);
         console.log('✅ Parsed answers:', JSON.stringify(answers, null, 2));
-      } catch (err) {
-        console.error('❌ Error parsing answers:', err.message);
-        return res.status(400).send(`Error parsing answers: ${err.message}`);
-      }
 
-      // Save consultation data to DynamoDB
-      try {
         const params = {
           TableName: TABLE_NAME,
           Item: {
@@ -60,16 +48,16 @@ export default async (req, res) => {
         await ddbDocClient.send(new PutCommand(params));
         console.log('✅ Consultation data saved to DynamoDB.');
       } catch (err) {
-        console.error('❌ Error saving to DynamoDB:', err.message);
-        return res.status(500).send('Internal Server Error');
+        console.error('❌ Error processing webhook:', err.message);
+        return res.status(500).json({ error: 'Internal Server Error', details: err.message });
       }
     } else {
       console.log(`⚠️ Unhandled event type: ${event.type}`);
     }
 
-    res.status(200).send('Received');
+    return res.status(200).json({ received: true });
   } else {
     res.setHeader('Allow', 'POST');
-    res.status(405).send('Method Not Allowed');
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 };
