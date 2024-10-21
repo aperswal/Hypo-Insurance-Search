@@ -15,6 +15,13 @@ import {
   InputAdornment
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FilterListIcon from '@mui/icons-material/FilterList'; // Add this line
+
+import { Paper, IconButton } from '@mui/material';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import BusinessIcon from '@mui/icons-material/Business';
+import GradeIcon from '@mui/icons-material/Grade';
 
   const InsuranceFilterComponent = ({ 
     onFilterChange, 
@@ -77,19 +84,32 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
   };
 
   return (
-    <Box sx={{ mb: 3, mt: 4 }}>
-      <Accordion sx={{ bgcolor: '#f5f5f5' }} id="insurance-filter-accordion">
-        <AccordionSummary 
+    <Paper elevation={3} sx={{ mb: 3, mt: 4, p: 2, borderRadius: 2 }}>
+      <Accordion
+        sx={{
+          bgcolor: 'transparent',
+          boxShadow: 'none',
+          '&:before': { display: 'none' },
+        }}
+      >
+        <AccordionSummary
           expandIcon={<ExpandMoreIcon />}
-          sx={{ '&:hover': { bgcolor: '#e0e0e0' } }}
-          id="insurance-filter-accordion-summary"
+          sx={{
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            borderRadius: 1,
+            '&:hover': { bgcolor: 'primary.dark' },
+          }}
         >
-          <Typography>Filter Insurance Plans</Typography>
+          <Typography variant="h6">Filter Insurance Plans</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Grid container spacing={3}>
+          <Grid container spacing={4}>
             <Grid item xs={12} sm={6} md={4}>
-              <Typography gutterBottom>Metal Levels</Typography>
+              <Box display="flex" alignItems="center" mb={1}>
+                <GradeIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1">Metal Levels</Typography>
+              </Box>
               <FormGroup>
                 {metalLevels.map(level => (
                   <FormControlLabel
@@ -106,7 +126,10 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
               </FormGroup>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
-              <Typography gutterBottom>Plan Types</Typography>
+              <Box display="flex" alignItems="center" mb={1}>
+                <LocalHospitalIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1">Plan Types</Typography>
+              </Box>
               <FormGroup>
                 {planTypes.map(type => (
                   <FormControlLabel
@@ -123,7 +146,10 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
               </FormGroup>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
-              <Typography gutterBottom>Issuers</Typography>
+              <Box display="flex" alignItems="center" mb={1}>
+                <BusinessIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1">Issuers</Typography>
+              </Box>
               <FormGroup>
                 {issuers.map(issuer => (
                   <FormControlLabel
@@ -139,16 +165,42 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
                 ))}
               </FormGroup>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography gutterBottom>Monthly Premium Range</Typography>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={filters.hsaEligible}
+                    onChange={(e) => handleBooleanChange('hsaEligible', e)}
+                  />
+                }
+                label="HSA Eligible"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={filters.hasNationalNetwork}
+                    onChange={(e) => handleBooleanChange('hasNationalNetwork', e)}
+                  />
+                }
+                label="Has National Network"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <AttachMoneyIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1">Monthly Premium Range</Typography>
+              </Box>
               <Slider
                 value={filters.premium}
                 onChange={(_, newValue) => handleSliderChange('premium', newValue)}
                 valueLabelDisplay="auto"
                 min={minPremium}
                 max={maxPremium}
+                sx={{ color: 'secondary.main' }}
               />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
                 <TextField
                   size="small"
                   value={filters.premium[0]}
@@ -171,16 +223,20 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
                 />
               </Box>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography gutterBottom>Deductible Range</Typography>
+            <Grid item xs={12} md={6}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <AttachMoneyIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="subtitle1">Deductible Range</Typography>
+              </Box>
               <Slider
                 value={filters.deductible}
                 onChange={(_, newValue) => handleSliderChange('deductible', newValue)}
                 valueLabelDisplay="auto"
                 min={minDeductible}
                 max={maxDeductible}
+                sx={{ color: 'secondary.main' }}
               />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
                 <TextField
                   size="small"
                   value={filters.deductible[0]}
@@ -203,35 +259,21 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
                 />
               </Box>
             </Grid>
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={filters.hsaEligible}
-                    onChange={(e) => handleBooleanChange('hsaEligible', e)}
-                  />
-                }
-                label="HSA Eligible"
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={filters.hasNationalNetwork}
-                    onChange={(e) => handleBooleanChange('hasNationalNetwork', e)}
-                  />
-                }
-                label="Has National Network"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Button variant="contained" color="primary" onClick={applyFilters}>
-                Apply Filters
-              </Button>
-            </Grid>
           </Grid>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={applyFilters}
+              startIcon={<FilterListIcon />}
+              sx={{ borderRadius: 20, px: 4 }}
+            >
+              Apply Filters
+            </Button>
+          </Box>
         </AccordionDetails>
       </Accordion>
-    </Box>
+    </Paper>
   );
 };
 

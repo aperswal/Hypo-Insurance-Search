@@ -1,7 +1,14 @@
 // src/App.js
 
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, Box, CircularProgress, Grid } from '@mui/material';
+import { 
+  Container, 
+  Typography, 
+  Box, 
+  CircularProgress, 
+  Grid, 
+  Paper 
+} from '@mui/material';
 import InsuranceSearchForm from './components/InsuranceSearchForm';
 import InsuranceFilterComponent from './components/InsuranceFilterComponent';
 import InsuranceSortComponent from './components/InsuranceSortComponent';
@@ -224,11 +231,11 @@ function App() {
                   </Box>
 
                   {insurancePlans && (
-                    <Box className="results-container">
-                      <Typography variant="h5" gutterBottom className="customize-results">
+                    <Paper elevation={3} sx={{ mb: 3, mt: 4, p: 2, borderRadius: 2 }}>
+                      <Typography variant="h5" gutterBottom sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>
                         Customize Your Results
                       </Typography>
-                      <Grid container spacing={2} className="filter-sort-container">
+                      <Grid container spacing={3} direction="column">
                         <Grid item xs={12}>
                           <InsuranceFilterComponent
                             onFilterChange={handleInsuranceFilterChange}
@@ -243,7 +250,7 @@ function App() {
                           <InsuranceSortComponent onSortChange={handleInsuranceSort} />
                         </Grid>
                       </Grid>
-                    </Box>
+                    </Paper>
                   )}
 
                   {loading && (
