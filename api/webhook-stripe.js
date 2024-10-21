@@ -1,5 +1,3 @@
-// api/webhook-stripe.js
-
 import { buffer } from 'micro';
 import Stripe from 'stripe';
 import { ddbDocClient, TABLE_NAME, PutCommand } from '../utils/dynamodb';
@@ -29,6 +27,7 @@ export default async (req, res) => {
       console.error('❌ Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
+
     console.log('Event type:', event.type);
     console.log('Event data:', JSON.stringify(event.data, null, 2));
 
