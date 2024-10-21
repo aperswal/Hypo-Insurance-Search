@@ -10,6 +10,8 @@ module.exports = async (req, res) => {
 
   const { answers } = req.body;
 
+  console.log('Received answers:', JSON.stringify(answers, null, 2));
+
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -27,6 +29,7 @@ module.exports = async (req, res) => {
       },
     });
 
+    console.log('Metadata being set:', JSON.stringify({ answers: JSON.stringify(answers) }, null, 2));
     console.log('✅ Checkout session created successfully:', session.id);
     res.status(200).json({ id: session.id });
   } catch (err) {

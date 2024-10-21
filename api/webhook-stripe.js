@@ -1,12 +1,11 @@
-// webhook-stripe.js
+// api/webhook-stripe.js
 
 import { buffer } from 'micro';
 import Stripe from 'stripe';
-import { MongoClient } from 'mongodb';
+import { ddbDocClient, TABLE_NAME, PutCommand } from '../utils/dynamodb';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-const mongodbUri = process.env.MONGODB_URI;
 
 export const config = {
   api: {
@@ -18,82 +17,55 @@ export default async (req, res) => {
   if (req.method === 'POST') {
     let event;
     const sig = req.headers['stripe-signature'];
+    console.log('Webhook received');
+    console.log('Request headers:', JSON.stringify(req.headers, null, 2));
 
     try {
       const buf = await buffer(req);
       const rawBody = buf.toString('utf8');
       event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
+      console.log('✅ Webhook signature verified.');
     } catch (err) {
       console.error('❌ Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-
-    console.log('🔔 Event received:', event.type);
+    console.log('Event type:', event.type);
+    console.log('Event data:', JSON.stringify(event.data, null, 2));
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       console.log('💳 Payment was successful!');
       console.log('Session details:', JSON.stringify(session, null, 2));
-      
+      console.log('Session metadata:', JSON.stringify(session.metadata, null, 2));
+
       let answers;
       try {
         answers = JSON.parse(session.metadata.answers);
-        console.log('Parsed answers:', JSON.stringify(answers, null, 2));
+        console.log('✅ Parsed answers:', JSON.stringify(answers, null, 2));
       } catch (err) {
         console.error('❌ Error parsing answers:', err.message);
         return res.status(400).send(`Error parsing answers: ${err.message}`);
       }
 
-      const client = new MongoClient(mongodbUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-
+      // Save consultation data to DynamoDB
       try {
-        console.log('Attempting to connect to MongoDB...');
-        await client.connect();
-        console.log('✅ Connected to MongoDB.');
-
-        const database = client.db('HypoInsuranceSearch');
-        const collection = database.collection('consultations');
-
-        console.log('Database and collection selected:', database.databaseName, collection.collectionName);
-
-        const consultationData = {
-          sessionId: session.id,
-          customerEmail: session.customer_details.email,
-          answers: answers,
-          paymentStatus: session.payment_status,
-          createdAt: new Date(),
+        const params = {
+          TableName: TABLE_NAME,
+          Item: {
+            sessionId: session.id,
+            customerEmail: session.customer_details.email,
+            createdAt: new Date().toISOString(),
+            answers: answers,
+          },
         };
-
-        console.log('Consultation data to be stored:', JSON.stringify(consultationData, null, 2));
-
-        // Use updateOne with upsert option to update or insert based on email
-        const result = await collection.updateOne(
-          { customerEmail: session.customer_details.email },
-          { $set: consultationData },
-          { upsert: true }
-        );
-
-        console.log('MongoDB operation result:', JSON.stringify(result, null, 2));
-
-        if (result.matchedCount > 0) {
-          console.log('✅ Document updated successfully');
-        } else if (result.upsertedCount > 0) {
-          console.log('✅ New document inserted successfully');
-        } else {
-          console.log('⚠️ Document was not updated or inserted');
-        }
+        await ddbDocClient.send(new PutCommand(params));
+        console.log('✅ Consultation data saved to DynamoDB.');
       } catch (err) {
-        console.error('❌ Error storing data in MongoDB:', err);
-        console.error('Error stack:', err.stack);
+        console.error('❌ Error saving to DynamoDB:', err.message);
         return res.status(500).send('Internal Server Error');
-      } finally {
-        console.log('Closing MongoDB connection...');
-        await client.close();
-        console.log('MongoDB connection closed.');
       }
+    } else {
+      console.log(`⚠️ Unhandled event type: ${event.type}`);
     }
 
     res.status(200).send('Received');

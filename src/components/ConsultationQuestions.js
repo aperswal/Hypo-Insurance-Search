@@ -326,16 +326,39 @@ const ConsultationQuestions = ({ onComplete }) => {
   const handleComplete = async () => {
     try {
       const stripe = await stripePromise;
-  
+
+      // Prepare the answers object
+      const consultationData = {
+        firstName: answers.firstName,
+        lastName: answers.lastName,
+        email: answers.email,
+        zipCode: answers.zipCode,
+        income: answers.income,
+        householdSize: answers.householdSize,
+        monthlyBudget: answers.monthlyBudget,
+        emergencyFund: answers.emergencyFund,
+        coverageYear: answers.coverageYear,
+        market: answers.market,
+        age: answers.age,
+        sex: answers.sex,
+        eligibleForCoverage: answers.eligibleForCoverage,
+        legalGuardian: answers.legalGuardian,
+        pregnant: answers.pregnant,
+        tobacco: answers.tobacco,
+        specialNeeds: answers.specialNeeds,
+        prescriptionDrugs: answers.prescriptionDrugs,
+        householdMembers: answers.householdMembers
+      };
+      console.log('Consultation data being sent:', JSON.stringify(consultationData, null, 2));
       // Call your server to create a Checkout Session
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers: consultationData }),
       });
-  
+
       // Check for response status
       if (!response.ok) {
         const errorData = await response.json();
@@ -343,22 +366,16 @@ const ConsultationQuestions = ({ onComplete }) => {
         setError('Failed to create checkout session. Please try again.');
         return;
       }
-  
-      // Parse the session data
-      const session = await response.json();
-  
-      // Redirect to Stripe Checkout
-      const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-      });
-  
-      // Handle error during the redirect
-      if (result.error) {
-        console.error(result.error.message);
-        setError(result.error.message);
+
+      const { id } = await response.json();
+      const stripeSession = await stripe.redirectToCheckout({ sessionId: id });
+
+      if (stripeSession.error) {
+        console.error('Stripe redirect error:', stripeSession.error);
+        setError('Stripe checkout failed. Please try again.');
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error during consultation completion:', error);
       setError('An unexpected error occurred. Please try again.');
     }
   };
@@ -440,7 +457,7 @@ const ConsultationQuestions = ({ onComplete }) => {
               value={formatCurrency(currentAnswer || '')}
               onChange={(e) => handleCurrencyChange(e, currentQuestion.id, memberIndex)}
               InputProps={{
-                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                startAdornment: <InputAdornment position="start"></InputAdornment>,
               }}
               sx={{ mt: 1 }}
             />
