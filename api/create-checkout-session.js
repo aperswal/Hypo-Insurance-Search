@@ -11,11 +11,12 @@ module.exports = async (req, res) => {
   console.log('Received answers:', JSON.stringify(answers, null, 2));
 
   try {
+    // Split the answers into chunks of 500 characters or less
+    const answerChunks = splitAnswersIntoChunks(answers);
+
     // Create a customer first
     const customer = await stripe.customers.create({
-      metadata: {
-        answers: JSON.stringify(answers),
-      },
+      metadata: answerChunks,
     });
 
     const session = await stripe.checkout.sessions.create({
@@ -39,3 +40,16 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error', message: err.message });
   }
 };
+
+function splitAnswersIntoChunks(answers) {
+  const answerString = JSON.stringify(answers);
+  const chunkSize = 490; // Leave some room for the key name
+  const chunks = {};
+
+  for (let i = 0; i < answerString.length; i += chunkSize) {
+    const chunkIndex = Math.floor(i / chunkSize);
+    chunks[`answers_${chunkIndex}`] = answerString.slice(i, i + chunkSize);
+  }
+
+  return chunks;
+}

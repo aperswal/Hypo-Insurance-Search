@@ -34,7 +34,7 @@ export default async (req, res) => {
 
       try {
         const customer = await stripe.customers.retrieve(session.customer);
-        const answers = JSON.parse(customer.metadata.answers);
+        const answers = reconstructAnswers(customer.metadata);
         console.log('✅ Parsed answers:', JSON.stringify(answers, null, 2));
 
         const params = {
@@ -62,3 +62,12 @@ export default async (req, res) => {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 };
+
+function reconstructAnswers(metadata) {
+  const chunks = Object.entries(metadata)
+    .filter(([key]) => key.startsWith('answers_'))
+    .sort(([a], [b]) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+
+  const fullAnswerString = chunks.map(([, value]) => value).join('');
+  return JSON.parse(fullAnswerString);
+}
