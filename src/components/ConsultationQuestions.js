@@ -346,7 +346,9 @@ const ConsultationQuestions = ({ onComplete }) => {
         pregnant: answers.pregnant,
         tobacco: answers.tobacco,
         specialNeeds: answers.specialNeeds,
+        specialNeedsList: answers.specialNeedsList,
         prescriptionDrugs: answers.prescriptionDrugs,
+        prescriptionDrugsList: answers.prescriptionDrugsList,
         householdMembers: answers.householdMembers
       };
       console.log('Consultation data being sent:', JSON.stringify(consultationData, null, 2));

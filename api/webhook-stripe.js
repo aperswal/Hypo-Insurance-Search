@@ -43,6 +43,8 @@ export default async (req, res) => {
             customerEmail: session.customer_details.email,
             createdAt: new Date().toISOString(),
             answers: answers,
+            prescriptionDrugsList: answers.prescriptionDrugsList,
+            specialNeedsList: answers.specialNeedsList,
           },
         };
         await ddbDocClient.send(new PutCommand(params));
