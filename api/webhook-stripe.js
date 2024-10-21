@@ -33,7 +33,8 @@ export default async (req, res) => {
       console.log('💳 Payment was successful!');
 
       try {
-        const answers = JSON.parse(session.metadata.answers);
+        const customer = await stripe.customers.retrieve(session.customer);
+        const answers = JSON.parse(customer.metadata.answers);
         console.log('✅ Parsed answers:', JSON.stringify(answers, null, 2));
 
         const params = {
@@ -43,8 +44,6 @@ export default async (req, res) => {
             customerEmail: session.customer_details.email,
             createdAt: new Date().toISOString(),
             answers: answers,
-            prescriptionDrugsList: answers.prescriptionDrugsList,
-            specialNeedsList: answers.specialNeedsList,
           },
         };
         await ddbDocClient.send(new PutCommand(params));
