@@ -142,9 +142,9 @@ function App() {
   // Referenced from App.js lines 134-195 for search, filter, and sort handlers
   const handleInsuranceSearch = async (formData) => {
     setLoading(true);
-    setError(null);
-    setInsurancePlans(null);
-    setFilteredInsurancePlans(null);
+    setError(null);  // Clear any existing error
+    setInsurancePlans(null);  // Clear existing plans
+    setFilteredInsurancePlans(null);  // Clear filtered plans
     setInsuranceFilterOptions({
       issuers: [],
       planTypes: [],
@@ -191,7 +191,6 @@ function App() {
       setInsurancePlans(data.plans);
       setFilteredInsurancePlans(data.plans);
       updateFilterOptions(data.plans);
-      setError(null);  // Ensure error is cleared on successful search
     } catch (error) {
       console.error('Error in insurance search:', error);
       
@@ -219,14 +218,6 @@ function App() {
           </Typography>
         </Box>
       );
-      setInsurancePlans(null);
-      setFilteredInsurancePlans(null);
-      setInsuranceFilterOptions({
-        issuers: [],
-        planTypes: [],
-        metalLevels: []
-      });
-      setError(null);
     } finally {
       setLoading(false);
     }

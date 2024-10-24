@@ -110,8 +110,9 @@ const InsuranceSearchForm = ({ onSubmit, onError }) => {
   const fetchCounties = async (stateAbbreviation) => {
     try {
       const response = await axios.get(`/api/counties/${stateAbbreviation}`, {
-        timeout: 10000 // Add 10 second timeout
+        timeout: 8000
       });
+      
       if (Array.isArray(response.data)) {
         setCounties(response.data);
       } else {
@@ -119,13 +120,21 @@ const InsuranceSearchForm = ({ onSubmit, onError }) => {
       }
     } catch (error) {
       console.error('Error fetching counties:', error);
-      const errorMessage = error.code === 'ECONNABORTED' 
-        ? 'Request timed out. Please try again.'
-        : 'Failed to fetch counties. Please try again.';
+      let errorMessage = 'Failed to fetch counties. ';
+      
+      if (error.code === 'ECONNABORTED' || error.response?.status === 504) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+      
       onError(
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
             {errorMessage}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            You can try selecting a different state or refreshing the page.
           </Typography>
         </Box>
       );
@@ -229,7 +238,10 @@ const InsuranceSearchForm = ({ onSubmit, onError }) => {
       );
       return;
     }
-
+  
+    // Clear the error state when submitting a valid form
+    setError(null);
+  
     const submissionData = {
       ...formData,
       income: formData.income.replace(/[^0-9]/g, '')
