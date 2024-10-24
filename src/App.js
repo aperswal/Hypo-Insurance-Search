@@ -143,7 +143,19 @@ function App() {
   const handleInsuranceSearch = async (formData) => {
     setLoading(true);
     setError(null);
+    setInsurancePlans(null);
+    setFilteredInsurancePlans(null);
+    setInsuranceFilterOptions({
+      issuers: [],
+      planTypes: [],
+      metalLevels: []
+    });
+    
     try {
+      if (!formData.zipCode || !formData.state || !formData.county) {
+        throw new Error('Please ensure all location information is provided');
+      }
+  
       const response = await fetch('/api/insurance-plans', {
         method: 'POST',
         headers: {
@@ -151,21 +163,73 @@ function App() {
         },
         body: JSON.stringify(formData),
       });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
+  
       const data = await response.json();
+  
+      if (!response.ok) {
+        let errorMessage = 'Unable to find insurance plans. ';
+        
+        if (data.apiResponse?.code === '1003') {
+          errorMessage += 'The ZIP code you entered does not match the selected state and county. Please verify your location information.';
+        } else if (data.apiResponse?.message) {
+          errorMessage += data.apiResponse.message;
+        } else {
+          errorMessage += 'Please check your information and try again.';
+        }
+        
+        throw new Error(errorMessage);
+      }
+  
+      if (!data.plans || !Array.isArray(data.plans)) {
+        throw new Error('No insurance plans found for your criteria. Please modify your search and try again.');
+      }
+  
+      if (data.plans.length === 0) {
+        throw new Error('No insurance plans available in your area. Please try a different location or modify your search criteria.');
+      }
+  
       setInsurancePlans(data.plans);
       setFilteredInsurancePlans(data.plans);
       updateFilterOptions(data.plans);
+      setError(null);  // Ensure error is cleared on successful search
     } catch (error) {
-      console.error('Error fetching insurance plans:', error);
-      setError(`An error occurred while fetching insurance plans: ${error.message}`);
+      console.error('Error in insurance search:', error);
+      
+      let userMessage = '';
+      if (error.message.includes('API key')) {
+        userMessage = 'We\'re experiencing technical difficulties. Please try again later.';
+      } else if (error.message.includes('zipcode')) {
+        userMessage = 'Please verify that your ZIP code matches your selected state and county.';
+      } else if (error.message.includes('No insurance plans')) {
+        userMessage = error.message;
+      } else {
+        userMessage = 'Unable to complete your search. Please verify your information and try again.';
+      }
+      
+      setError(
+        <Box sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+            Search Error
+          </Typography>
+          <Typography variant="body1">
+            {userMessage}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+            Need help? Contact our support team.
+          </Typography>
+        </Box>
+      );
       setInsurancePlans(null);
       setFilteredInsurancePlans(null);
+      setInsuranceFilterOptions({
+        issuers: [],
+        planTypes: [],
+        metalLevels: []
+      });
+      setError(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Referenced from App.js lines 162-195 for filter and sort handlers
@@ -276,9 +340,20 @@ function App() {
           )}
 
           {error && (
-            <Box className="error-container">
-              <Typography color="error">{error}</Typography>
-            </Box>
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                mt: 2, 
+                mb: 3, 
+                p: 2, 
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'error.light',
+                backgroundColor: 'error.lighter'
+              }}
+            >
+              {error}
+            </Paper>
           )}
 
           {filteredInsurancePlans && (

@@ -98,6 +98,45 @@ Before you begin, ensure you have the following installed:
 6. Sort plans based on your preferences.
 7. Click on a plan card to expand and view additional information.
 
+## Project Structure
+
+├── .vercel/                # Vercel deployment configuration
+├── api/                     # API endpoints and backend logic
+│   └── counties/           # County-related API endpoints
+│       ├── [state].js      # State-specific county data
+│       ├── create-checkout-session.js
+│       ├── insurance-plans.js
+│       └── webhook-stripe.js
+├── build/                   # Build output directory
+├── node_modules/            # Node.js dependencies
+├── public/                  # Static public assets
+├── src/                     # Source code
+│   ├── components/         # React components
+│   │   ├── ConsultationPopup.js
+│   │   ├── ConsultationQuestions.js
+│   │   ├── InsuranceCard.js
+│   │   ├── InsuranceConsultationBox.js
+│   │   ├── InsuranceFilterComponent.js
+│   │   ├── InsurancePlanList.js
+│   │   ├── InsuranceSearchForm.js
+│   │   └── InsuranceSortComponent.js
+│   ├── pages/             # Page components
+│   │   ├── Cancel.js      # Cancel page
+│   │   └── Success.js     # Success page
+│   ├── utils/             # Utility functions
+│   │   └── dynamodb.js    # DynamoDB utilities
+│   ├── App.css            # Main application styles
+│   ├── App.js             # Main application component
+│   ├── index.css          # Global styles
+│   └── index.js           # Application entry point
+├── .env                    # Environment variables
+├── .env.local             # Local environment variables
+├── .gitignore             # Git ignore configurations
+├── LICENSE                # Project license
+├── package-lock.json      # Dependency lock file
+├── package.json           # Project configuration and dependencies
+└── output.txt             # Output logs
+
 ## API Integration
 
 ### Marketplace API

@@ -17,10 +17,10 @@ import {
   IconButton, 
   Autocomplete,
   InputAdornment,
-  Snackbar,
-  Alert
+  Box
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+
 
 const states = [
   { name: 'Alabama', abbreviation: 'AL' },
@@ -80,7 +80,7 @@ const formatIncome = (value) => {
   return numericValue ? `${parseInt(numericValue).toLocaleString()}` : '';
 };
 
-const InsuranceSearchForm = ({ onSubmit }) => {
+const InsuranceSearchForm = ({ onSubmit, onError }) => {
   const [formData, setFormData] = useState({
     income: '',
     zipCode: '',
@@ -109,9 +109,9 @@ const InsuranceSearchForm = ({ onSubmit }) => {
 
   const fetchCounties = async (stateAbbreviation) => {
     try {
-      setError(null);
-      const response = await axios.get(`/api/counties/${stateAbbreviation}`);
-      console.log('County response:', response.data);
+      const response = await axios.get(`/api/counties/${stateAbbreviation}`, {
+        timeout: 10000 // Add 10 second timeout
+      });
       if (Array.isArray(response.data)) {
         setCounties(response.data);
       } else {
@@ -119,24 +119,86 @@ const InsuranceSearchForm = ({ onSubmit }) => {
       }
     } catch (error) {
       console.error('Error fetching counties:', error);
-      setError('Failed to fetch counties. Please try again.');
+      const errorMessage = error.code === 'ECONNABORTED' 
+        ? 'Request timed out. Please try again.'
+        : 'Failed to fetch counties. Please try again.';
+      onError(
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+            {errorMessage}
+          </Typography>
+        </Box>
+      );
       setCounties([]);
     }
   };
 
+  const validateForm = (formData) => {
+    const errors = [];
+    const income = parseInt(formData.income.replace(/[^0-9]/g, ''));
+  
+    // Validate income
+    if (income < 0) {
+      errors.push("Income cannot be negative");
+    }
+    if (income > 999999999) {
+      errors.push("Please enter a valid income amount");
+    }
+  
+    // Validate ZIP code
+    if (!/^\d{5}$/.test(formData.zipCode)) {
+      errors.push("Please enter a valid 5-digit ZIP code");
+    }
+  
+    // Validate state and county
+    if (!formData.state) {
+      errors.push("Please select a state");
+    }
+    if (!formData.county) {
+      errors.push("Please select a county");
+    }
+  
+    // Validate people
+    formData.people.forEach((person, index) => {
+      const personNum = index + 1;
+      const age = parseInt(person.age);
+  
+      if (isNaN(age) || age < 0 || age > 120) {
+        errors.push(`Person ${personNum}: Please enter a valid age between 0 and 120`);
+      }
+  
+      if (!person.gender) {
+        errors.push(`Person ${personNum}: Please select a gender`);
+      }
+  
+      if (person.pregnant && person.gender === 'Male') {
+        errors.push(`Person ${personNum}: Males cannot be marked as pregnant`);
+      }
+      if (person.pregnant && (age < 12 || age > 60)) {
+        errors.push(`Person ${personNum}: Please verify pregnancy status for the given age`);
+      }
+    });
+  
+    return errors;
+  };
+  
   const handleChange = (e, index) => {
     const { name, value, checked, type } = e.target;
+    
     if (name === 'income') {
       setFormData({ ...formData, income: formatIncome(value) });
-    } else if (name.startsWith('person')) {
+    } else if (name === 'zipCode' || name === 'county') {
+      setFormData({ ...formData, [name]: value });
+    } else if (name.includes('age') || name.includes('gender') || 
+               name.includes('eligibleForCoverage') || name.includes('legalGuardian') || 
+               name.includes('pregnant') || name.includes('tobaccoUser')) {
+      const field = name.split('.').pop();
       const newPeople = [...formData.people];
-      newPeople[index] = { 
-        ...newPeople[index], 
-        [name.split('.')[1]]: type === 'checkbox' ? checked : value 
+      newPeople[index] = {
+        ...newPeople[index],
+        [field]: type === 'checkbox' ? checked : value
       };
       setFormData({ ...formData, people: newPeople });
-    } else {
-      setFormData({ ...formData, [name]: value });
     }
   };
 
@@ -150,9 +212,27 @@ const InsuranceSearchForm = ({ onSubmit }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    const validationErrors = validateForm(formData);
+    if (validationErrors.length > 0) {
+      setError(
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+            Please correct the following:
+          </Typography>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {validationErrors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </Box>
+      );
+      return;
+    }
+
     const submissionData = {
       ...formData,
-      income: formData.income.replace(/[^0-9]/g, '') // Remove non-numeric characters
+      income: formData.income.replace(/[^0-9]/g, '')
     };
     onSubmit(submissionData);
   };
@@ -178,6 +258,11 @@ const InsuranceSearchForm = ({ onSubmit }) => {
 
   return (
     <>
+      {error && (
+        <Box sx={{ mb: 2 }}>
+          {error}
+        </Box>
+      )}
       <form onSubmit={handleSubmit}>
         <Grid container spacing={3}>
           <Grid item xs={12}>
@@ -219,7 +304,7 @@ const InsuranceSearchForm = ({ onSubmit }) => {
             <Autocomplete
               options={counties}
               renderInput={(params) => <TextField {...params} label="County" required />}
-              onChange={(event, newValue) => handleCountyChange(event, newValue)}
+              onChange={handleCountyChange}
               value={formData.county}
               disabled={!formData.state}
             />
@@ -235,21 +320,21 @@ const InsuranceSearchForm = ({ onSubmit }) => {
                     <TextField
                       fullWidth
                       label="Age"
-                      name={`person.age`}
+                      name={`person.${index}.age`}
                       type="number"
                       value={person.age}
                       onChange={(e) => handleChange(e, index)}
                       required
-                    />
+                      />
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth required>
                       <InputLabel>Sex</InputLabel>
                       <Select
-                        name={`person.gender`}
+                        name={`person.${index}.gender`}
                         value={person.gender}
                         onChange={(e) => handleChange(e, index)}
-                        required
+                        label="Sex"
                       >
                         <MenuItem value="Male">Male</MenuItem>
                         <MenuItem value="Female">Female</MenuItem>
@@ -264,7 +349,7 @@ const InsuranceSearchForm = ({ onSubmit }) => {
                             <Checkbox
                               checked={person.eligibleForCoverage}
                               onChange={(e) => handleChange(e, index)}
-                              name={`person.eligibleForCoverage`}
+                              name={`person.${index}.eligibleForCoverage`}
                             />
                           }
                           label="Eligible for health coverage through a job, Medicare, Medicaid, or CHIP"
@@ -276,7 +361,7 @@ const InsuranceSearchForm = ({ onSubmit }) => {
                             <Checkbox
                               checked={person.legalGuardian}
                               onChange={(e) => handleChange(e, index)}
-                              name={`person.legalGuardian`}
+                              name={`person.${index}.legalGuardian`}
                             />
                           }
                           label="Legal parent or guardian of a child under 19 (claimed as a tax dependent)"
@@ -288,7 +373,7 @@ const InsuranceSearchForm = ({ onSubmit }) => {
                             <Checkbox
                               checked={person.pregnant}
                               onChange={(e) => handleChange(e, index)}
-                              name={`person.pregnant`}
+                              name={`person.${index}.pregnant`}
                             />
                           }
                           label="Pregnant"
@@ -300,7 +385,7 @@ const InsuranceSearchForm = ({ onSubmit }) => {
                             <Checkbox
                               checked={person.tobaccoUser}
                               onChange={(e) => handleChange(e, index)}
-                              name={`person.tobaccoUser`}
+                              name={`person.${index}.tobaccoUser`}
                             />
                           }
                           label="Tobacco user"
@@ -329,15 +414,9 @@ const InsuranceSearchForm = ({ onSubmit }) => {
           </Grid>
         </Grid>
       </form>
-
-      {/* Display error using Snackbar */}
-      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
-        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
     </>
   );
 };
+
 
 export default InsuranceSearchForm;
