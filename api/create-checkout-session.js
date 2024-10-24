@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: 'price_1Q8pNxGDDWAeQTzJ7sjocNYN', // Ensure this price ID exists
+          price: 'price_1Q3nKdGDDWAeQTzJtv05dFtR', // Ensure this price ID exists
           quantity: 1,
         },
       ],
