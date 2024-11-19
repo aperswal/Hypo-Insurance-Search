@@ -18,6 +18,7 @@ import Success from './pages/Success';
 import Cancel from './pages/Cancel';
 import './App.css';
 import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 function App() {
   // Referenced from App.js lines 22-39 for state declarations
@@ -383,7 +384,8 @@ function AppWrapper() {
         <Route path="/cancel" element={<Cancel />} />
       </Routes>
     </Router>
-    <Analytics />
+      <Analytics />
+      <SpeedInsights />
     </>
   );
 }
