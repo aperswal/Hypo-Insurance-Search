@@ -17,6 +17,7 @@ import ConsultationPopup from './components/ConsultationPopup';
 import Success from './pages/Success';
 import Cancel from './pages/Cancel';
 import './App.css';
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   // Referenced from App.js lines 22-39 for state declarations
@@ -374,6 +375,7 @@ function App() {
 // Referenced from App.js lines 296-309 for the AppWrapper
 function AppWrapper() {
   return (
+    <>
     <Router>
       <Routes>
         <Route path="/" element={<App />} />
@@ -381,6 +383,8 @@ function AppWrapper() {
         <Route path="/cancel" element={<Cancel />} />
       </Routes>
     </Router>
+    <Analytics />
+    </>
   );
 }
 
