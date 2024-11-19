@@ -291,7 +291,7 @@ const InsuranceSearchForm = ({ onSubmit, onError }) => {
               InputProps={{
                 startAdornment: <InputAdornment position="start">$</InputAdornment>,
               }}
-            />
+            />  
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
